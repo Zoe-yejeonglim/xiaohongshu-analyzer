@@ -1,3 +1,6 @@
+from dotenv import load_dotenv
+load_dotenv()  # 加载.env文件
+
 from flask import Flask, render_template, request, jsonify, redirect, url_for
 import pandas as pd
 from datetime import datetime
