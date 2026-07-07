@@ -1,0 +1,359 @@
+{% extends "base.html" %}
+
+{% block title %}数据概览 - 小红书运营分析{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div class="page-header-row">
+        <div>
+            <h1 class="page-title">数据概览</h1>
+            <p class="page-subtitle">账号数据与涨粉趋势</p>
+        </div>
+        <div>
+            <button id="syncBtn" class="btn btn-primary" onclick="startSync()">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:6px"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 16h5v5"/></svg>
+                一键更新数据
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- 同步状态弹窗 -->
+<div id="syncModal" class="modal" style="display:none">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3 id="syncTitle">正在打开小红书...</h3>
+            <button class="modal-close" onclick="cancelSync()">&times;</button>
+        </div>
+        <div class="modal-body">
+            <p id="syncMessage">正在启动浏览器，请稍候...</p>
+            <div id="syncProgress" class="progress-bar">
+                <div class="progress-fill"></div>
+            </div>
+        </div>
+        <div class="modal-footer" id="syncActions" style="display:none">
+            <button class="btn btn-secondary" onclick="cancelSync()">取消</button>
+            <button class="btn btn-primary" onclick="continueSync()">登录完成，继续抓取</button>
+        </div>
+    </div>
+</div>
+
+<!-- Stats -->
+<div class="stats-row">
+    <div class="stat-card">
+        <div class="stat-icon blue">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/></svg>
+        </div>
+        <div class="stat-content">
+            <div class="stat-label">笔记数</div>
+            <div class="stat-value">{{ overview.total_notes or 0 }}</div>
+        </div>
+    </div>
+
+    <div class="stat-card">
+        <div class="stat-icon rose">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        </div>
+        <div class="stat-content">
+            <div class="stat-label">粉丝</div>
+            <div class="stat-value">
+                {{ "{:,}".format(overview.followers or 0) }}
+                {% if daily_stats|length > 1 %}
+                    {% set diff = daily_stats[0].followers - daily_stats[1].followers %}
+                    {% if diff > 0 %}
+                    <span class="stat-change positive">+{{ diff }}</span>
+                    {% elif diff < 0 %}
+                    <span class="stat-change negative">{{ diff }}</span>
+                    {% endif %}
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <div class="stat-card">
+        <div class="stat-icon orange">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/></svg>
+        </div>
+        <div class="stat-content">
+            <div class="stat-label">获赞与收藏</div>
+            <div class="stat-value">{{ "{:,}".format(overview.likes_and_saves or 0) }}</div>
+        </div>
+    </div>
+</div>
+
+<!-- Chart -->
+<div class="card">
+    <div class="card-header">
+        <div>
+            <h2 class="card-title">涨粉趋势</h2>
+        </div>
+        {% if overview.last_update %}
+        <span class="card-date">{{ overview.last_update }}</span>
+        {% endif %}
+    </div>
+    <div class="chart-container">
+        <canvas id="trendChart"></canvas>
+    </div>
+</div>
+
+<!-- Daily Stats -->
+<div class="card">
+    <div class="card-header">
+        <div>
+            <h2 class="card-title">每日数据记录</h2>
+            <p class="card-subtitle">每天记录一次用于生成趋势图</p>
+        </div>
+    </div>
+
+    <form method="POST" action="{{ url_for('add_daily_stat') }}" class="form-row-inline">
+        <div class="form-group">
+            <label>日期</label>
+            <input type="date" name="date" required>
+        </div>
+        <div class="form-group">
+            <label>粉丝数</label>
+            <input type="number" name="followers" min="0" placeholder="当前粉丝" required>
+        </div>
+        <div class="form-group">
+            <label>获赞与收藏</label>
+            <input type="number" name="likes_and_saves" min="0" placeholder="总数">
+        </div>
+        <button type="submit" class="btn btn-primary">记录</button>
+    </form>
+
+    {% if daily_stats %}
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>日期</th>
+                <th>粉丝</th>
+                <th>涨粉</th>
+                <th>获赞与收藏</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for stat in daily_stats %}
+            <tr>
+                <td>{{ stat.date }}</td>
+                <td>{{ "{:,}".format(stat.followers) }}</td>
+                <td>
+                    {% if loop.index < daily_stats|length %}
+                        {% set prev = daily_stats[loop.index] %}
+                        {% set diff = stat.followers - prev.followers %}
+                        {% if diff > 0 %}<span class="positive">+{{ diff }}</span>
+                        {% elif diff < 0 %}<span class="negative">{{ diff }}</span>
+                        {% else %}-{% endif %}
+                    {% else %}-{% endif %}
+                </td>
+                <td>{{ "{:,}".format(stat.likes_and_saves) }}</td>
+                <td><button class="btn btn-sm btn-danger" onclick="deleteStat({{ stat.id }})">删除</button></td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <div class="empty-state">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></svg>
+        <p>暂无数据记录</p>
+        <p>在上方添加数据开始追踪</p>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const dailyData = {{ chart_data | tojson }};
+const notesData = {{ notes_for_chart | tojson }};
+
+if (dailyData && dailyData.length > 0) {
+    const ctx = document.getElementById('trendChart').getContext('2d');
+
+    const labels = dailyData.map(d => d.date);
+    const followers = dailyData.map(d => d.followers);
+
+    // Find note publish dates
+    const noteAnnotations = [];
+    notesData.forEach(note => {
+        if (note.publish_time) {
+            const noteDate = note.publish_time.split(' ')[0];
+            const index = labels.indexOf(noteDate);
+            if (index !== -1) {
+                noteAnnotations.push({ index, title: note.title, gain: note.followers_gain });
+            }
+        }
+    });
+
+    const notePoints = new Array(labels.length).fill(null);
+    noteAnnotations.forEach(n => { notePoints[n.index] = followers[n.index]; });
+
+    new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [
+                {
+                    label: '粉丝',
+                    data: followers,
+                    borderColor: '#7C8DB0',
+                    backgroundColor: 'transparent',
+                    borderWidth: 2,
+                    tension: 0.4,
+                    fill: false,
+                    pointRadius: 0,
+                    pointHoverRadius: 4,
+                    pointHoverBackgroundColor: '#7C8DB0'
+                },
+                {
+                    label: '发布笔记',
+                    data: notePoints,
+                    borderColor: '#C9A87C',
+                    backgroundColor: '#C9A87C',
+                    pointRadius: 5,
+                    pointHoverRadius: 7,
+                    showLine: false
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: {
+                intersect: false,
+                mode: 'index'
+            },
+            plugins: {
+                legend: {
+                    display: true,
+                    position: 'top',
+                    align: 'end',
+                    labels: {
+                        boxWidth: 12,
+                        boxHeight: 2,
+                        usePointStyle: false,
+                        padding: 16,
+                        font: { size: 11, weight: '500' },
+                        color: '#9CA3B4'
+                    }
+                },
+                tooltip: {
+                    backgroundColor: '#2D3142',
+                    titleFont: { size: 11 },
+                    bodyFont: { size: 11 },
+                    padding: 10,
+                    cornerRadius: 6,
+                    displayColors: true,
+                    boxWidth: 8,
+                    boxHeight: 8,
+                    callbacks: {
+                        afterLabel: function(ctx) {
+                            if (ctx.datasetIndex === 1 && ctx.raw !== null) {
+                                const note = noteAnnotations.find(n => n.index === ctx.dataIndex);
+                                if (note) return '笔记: ' + note.title.substring(0, 16) + '...';
+                            }
+                            return '';
+                        }
+                    }
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: false,
+                    grid: { color: '#F0F2F5', drawBorder: false },
+                    ticks: { color: '#9CA3B4', font: { size: 10 }, padding: 8 },
+                    border: { display: false }
+                },
+                x: {
+                    grid: { display: false },
+                    ticks: { color: '#9CA3B4', font: { size: 10 }, padding: 8 },
+                    border: { display: false }
+                }
+            }
+        }
+    });
+}
+
+function deleteStat(id) {
+    if (confirm('确定删除？')) {
+        fetch('/daily-stats/' + id + '/delete', { method: 'POST' })
+        .then(r => r.json()).then(d => { if (d.success) location.reload(); });
+    }
+}
+
+// ============ 一键更新数据功能 ============
+
+function showModal(show) {
+    document.getElementById('syncModal').style.display = show ? 'flex' : 'none';
+}
+
+function updateModalState(title, message, showActions) {
+    document.getElementById('syncTitle').textContent = title;
+    document.getElementById('syncMessage').textContent = message;
+    document.getElementById('syncActions').style.display = showActions ? 'flex' : 'none';
+    document.getElementById('syncProgress').style.display = showActions ? 'none' : 'block';
+}
+
+function startSync() {
+    showModal(true);
+    updateModalState('正在打开小红书...', '正在启动浏览器，请稍候...', false);
+
+    fetch('/api/scrape/start', { method: 'POST' })
+        .then(r => r.json())
+        .then(data => {
+            if (data.error === 'NEED_LOGIN') {
+                updateModalState(
+                    '请登录小红书',
+                    '浏览器已打开，请在浏览器中扫码登录小红书创作者中心。登录成功后点击下方按钮继续。',
+                    true
+                );
+            } else if (data.success) {
+                updateModalState('同步完成！', `成功更新 ${data.notes?.length || 0} 篇笔记数据`, false);
+                setTimeout(() => {
+                    showModal(false);
+                    location.reload();
+                }, 2000);
+            } else {
+                updateModalState('同步失败', data.error || '未知错误', false);
+                setTimeout(() => showModal(false), 3000);
+            }
+        })
+        .catch(err => {
+            updateModalState('同步失败', err.message, false);
+            setTimeout(() => showModal(false), 3000);
+        });
+}
+
+function continueSync() {
+    updateModalState('正在抓取数据...', '正在读取笔记数据，请稍候...', false);
+
+    fetch('/api/scrape/continue', { method: 'POST' })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                updateModalState(
+                    '同步完成！',
+                    `成功更新 ${data.imported || 0} 篇笔记数据`,
+                    false
+                );
+                setTimeout(() => {
+                    showModal(false);
+                    location.reload();
+                }, 2000);
+            } else {
+                updateModalState('同步失败', data.error || '抓取失败', false);
+                setTimeout(() => showModal(false), 3000);
+            }
+        })
+        .catch(err => {
+            updateModalState('同步失败', err.message, false);
+            setTimeout(() => showModal(false), 3000);
+        });
+}
+
+function cancelSync() {
+    fetch('/api/scrape/cancel', { method: 'POST' });
+    showModal(false);
+}
+</script>
+{% endblock %}

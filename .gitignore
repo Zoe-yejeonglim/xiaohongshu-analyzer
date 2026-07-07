@@ -1,0 +1,30 @@
+# 数据文件 - 通过iCloud同步，不放git
+data/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+ENV/
+.env
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# 日志
+*.log
+
+# 临时文件
+*.tmp
+*.bak

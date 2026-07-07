@@ -1,0 +1,114 @@
+{% extends "base.html" %}
+
+{% block title %}{% if edit %}编辑笔记{% else %}添加笔记{% endif %} - 小红书运营分析助手{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div class="page-header-row">
+        <div>
+            <h1 class="page-title">{% if edit %}编辑笔记{% else %}添加笔记{% endif %}</h1>
+            <p class="page-subtitle">{% if edit %}修改笔记信息{% else %}记录新的笔记数据{% endif %}</p>
+        </div>
+        <a href="{{ url_for('notes') }}" class="btn btn-secondary">
+            <i data-lucide="arrow-left"></i>
+            返回
+        </a>
+    </div>
+</div>
+
+<div class="form-container" style="max-width: 720px;">
+    <form method="POST">
+        <div class="form-section">
+            <h3 class="form-section-title">基本信息</h3>
+            <div class="form-group full-width">
+                <label>笔记标题 <span style="color: var(--accent-red);">*</span></label>
+                <input type="text" name="title" required
+                       value="{{ note.title if note else '' }}"
+                       placeholder="输入笔记标题">
+            </div>
+
+            <div class="form-group full-width">
+                <label>文案内容</label>
+                <textarea name="content" rows="4"
+                          placeholder="输入笔记文案（可选，用于AI分析）">{{ note.content if note else '' }}</textarea>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label>内容类型</label>
+                    <select name="type">
+                        <option value="图文" {% if note and note.type == '图文' %}selected{% endif %}>图文</option>
+                        <option value="视频" {% if note and note.type == '视频' %}selected{% endif %}>视频</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>发布时间</label>
+                    <input type="datetime-local" name="publish_time"
+                           value="{{ note.publish_time[:16] if note and note.publish_time else '' }}">
+                </div>
+            </div>
+        </div>
+
+        <div class="form-section">
+            <h3 class="form-section-title">粉丝数据</h3>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>发布前粉丝数</label>
+                    <input type="number" name="followers_before" min="0"
+                           value="{{ note.followers_before if note else 0 }}"
+                           placeholder="发布时的粉丝数">
+                </div>
+                <div class="form-group">
+                    <label>发布后粉丝数</label>
+                    <input type="number" name="followers_after" min="0"
+                           value="{{ note.followers_after if note else 0 }}"
+                           placeholder="数据稳定后的粉丝数">
+                </div>
+            </div>
+        </div>
+
+        <div class="form-section">
+            <h3 class="form-section-title">笔记数据</h3>
+            <div class="form-grid">
+                <div class="form-group">
+                    <label>曝光量</label>
+                    <input type="number" name="exposure" min="0" value="{{ note.exposure if note else 0 }}">
+                </div>
+                <div class="form-group">
+                    <label>观看量</label>
+                    <input type="number" name="views" min="0" value="{{ note.views if note else 0 }}">
+                </div>
+                <div class="form-group">
+                    <label>点击率 (%)</label>
+                    <input type="number" name="click_rate" min="0" max="100" step="0.01" value="{{ note.click_rate if note else 0 }}">
+                </div>
+                <div class="form-group">
+                    <label>点赞数</label>
+                    <input type="number" name="likes" min="0" value="{{ note.likes if note else 0 }}">
+                </div>
+                <div class="form-group">
+                    <label>评论数</label>
+                    <input type="number" name="comments" min="0" value="{{ note.comments if note else 0 }}">
+                </div>
+                <div class="form-group">
+                    <label>收藏数</label>
+                    <input type="number" name="saves" min="0" value="{{ note.saves if note else 0 }}">
+                </div>
+                <div class="form-group">
+                    <label>分享数</label>
+                    <input type="number" name="shares" min="0" value="{{ note.shares if note else 0 }}">
+                </div>
+            </div>
+        </div>
+
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary">{% if edit %}保存修改{% else %}添加笔记{% endif %}</button>
+            <a href="{{ url_for('notes') }}" class="btn btn-secondary">取消</a>
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>lucide.createIcons();</script>
+{% endblock %}

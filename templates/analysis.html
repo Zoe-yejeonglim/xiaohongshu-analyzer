@@ -1,0 +1,161 @@
+{% extends "base.html" %}
+
+{% block title %}AI分析 - 小红书运营分析助手{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div class="page-header-row">
+        <div>
+            <h1 class="page-title">AI 分析</h1>
+            <p class="page-subtitle">使用 Claude AI 获取专业运营建议</p>
+        </div>
+    </div>
+</div>
+
+{% if not has_api_key %}
+<div class="alert alert-warning">
+    <i data-lucide="alert-triangle" style="width: 18px; height: 18px;"></i>
+    请先在 <a href="{{ url_for('settings') }}">设置页面</a> 配置 API Key
+</div>
+{% endif %}
+
+<div class="analysis-grid">
+    <!-- 账号诊断 -->
+    <div class="analysis-card">
+        <div class="analysis-card-header">
+            <h3 class="analysis-card-title">账号诊断</h3>
+            <p class="analysis-card-desc">分析账号数据，找出问题和涨粉建议</p>
+        </div>
+        <button class="btn btn-primary" style="width: 100%;" onclick="runAnalysis('account')" {% if not has_api_key %}disabled{% endif %}>
+            开始诊断
+        </button>
+        <div id="account-result" class="analysis-result"></div>
+    </div>
+
+    <!-- 内容方向 -->
+    <div class="analysis-card">
+        <div class="analysis-card-header">
+            <h3 class="analysis-card-title">内容方向</h3>
+            <p class="analysis-card-desc">根据历史数据推荐内容方向</p>
+        </div>
+        <button class="btn btn-primary" style="width: 100%;" onclick="runAnalysis('direction')" {% if not has_api_key %}disabled{% endif %}>
+            获取建议
+        </button>
+        <div id="direction-result" class="analysis-result"></div>
+    </div>
+
+    <!-- 选题推荐 -->
+    <div class="analysis-card">
+        <div class="analysis-card-header">
+            <h3 class="analysis-card-title">选题推荐</h3>
+            <p class="analysis-card-desc">基于爆款规律推荐选题</p>
+        </div>
+        <div class="form-group">
+            <input type="text" id="niche-input" placeholder="输入领域（可选）">
+        </div>
+        <button class="btn btn-primary" style="width: 100%;" onclick="runAnalysis('topics')" {% if not has_api_key %}disabled{% endif %}>
+            推荐选题
+        </button>
+        <div id="topics-result" class="analysis-result"></div>
+    </div>
+
+    <!-- 标题优化 -->
+    <div class="analysis-card">
+        <div class="analysis-card-header">
+            <h3 class="analysis-card-title">标题优化</h3>
+            <p class="analysis-card-desc">优化标题提升点击率</p>
+        </div>
+        <div class="form-group">
+            <input type="text" id="title-input" placeholder="输入当前标题">
+        </div>
+        <div class="form-group">
+            <textarea id="content-input" placeholder="输入内容（可选）" rows="2"></textarea>
+        </div>
+        <button class="btn btn-primary" style="width: 100%;" onclick="runAnalysis('title')" {% if not has_api_key %}disabled{% endif %}>
+            优化标题
+        </button>
+        <div id="title-result" class="analysis-result"></div>
+    </div>
+
+    <!-- 单篇分析 -->
+    <div class="analysis-card full-width">
+        <div class="analysis-card-header">
+            <h3 class="analysis-card-title">单篇笔记分析</h3>
+            <p class="analysis-card-desc">分析某篇笔记表现好/差的原因</p>
+        </div>
+        <div class="form-group">
+            <select id="note-select">
+                <option value="">选择要分析的笔记</option>
+                {% for note in notes %}
+                <option value="{{ note.id }}">{{ note.title[:45] }}{% if note.title|length > 45 %}...{% endif %} (点赞:{{ note.likes }})</option>
+                {% endfor %}
+            </select>
+        </div>
+        <button class="btn btn-primary" onclick="runAnalysis('note')" {% if not has_api_key %}disabled{% endif %}>
+            分析笔记
+        </button>
+        <div id="note-result" class="analysis-result"></div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    lucide.createIcons();
+
+    function runAnalysis(type) {
+        const resultDiv = document.getElementById(type + '-result');
+        resultDiv.innerHTML = '<p class="loading">AI 正在分析...</p>';
+
+        let url, data = {};
+
+        switch(type) {
+            case 'account': url = '/api/analyze/account'; break;
+            case 'direction': url = '/api/analyze/direction'; break;
+            case 'topics':
+                url = '/api/analyze/topics';
+                data = { niche: document.getElementById('niche-input').value };
+                break;
+            case 'title':
+                url = '/api/analyze/title';
+                data = {
+                    title: document.getElementById('title-input').value,
+                    content: document.getElementById('content-input').value
+                };
+                if (!data.title && !data.content) {
+                    resultDiv.innerHTML = '<p class="error">请输入标题或内容</p>';
+                    return;
+                }
+                break;
+            case 'note':
+                const noteId = document.getElementById('note-select').value;
+                if (!noteId) {
+                    resultDiv.innerHTML = '<p class="error">请选择笔记</p>';
+                    return;
+                }
+                url = '/api/analyze/note/' + noteId;
+                break;
+        }
+
+        fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.error) {
+                resultDiv.innerHTML = '<p class="error">' + data.error + '</p>';
+            } else {
+                let result = data.result
+                    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                    .replace(/\n/g, '<br>');
+                resultDiv.innerHTML = '<div class="result-content">' + result + '</div>';
+            }
+        })
+        .catch(error => {
+            resultDiv.innerHTML = '<p class="error">分析失败</p>';
+        });
+    }
+</script>
+{% endblock %}

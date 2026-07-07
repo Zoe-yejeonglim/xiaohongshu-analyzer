@@ -1,0 +1,201 @@
+{% extends "base.html" %}
+
+{% block title %}笔记管理 - 小红书运营分析助手{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div class="page-header-row">
+        <div>
+            <h1 class="page-title">笔记管理</h1>
+            <p class="page-subtitle">管理小红书笔记数据</p>
+        </div>
+    </div>
+</div>
+
+<!-- Actions -->
+<div class="actions-row">
+    <a href="{{ url_for('add_note') }}" class="btn btn-primary">
+        <i data-lucide="plus"></i>
+        添加笔记
+    </a>
+    <button class="btn btn-secondary" onclick="showImportModal()">
+        <i data-lucide="upload"></i>
+        导入Excel
+    </button>
+</div>
+
+<!-- Filter Bar -->
+<div class="filter-bar">
+    <div class="filter-group">
+        <label>排序</label>
+        <select id="orderBy" onchange="applyFilter()">
+            <option value="publish_time" {% if request.args.get('order_by', 'publish_time') == 'publish_time' %}selected{% endif %}>发布时间</option>
+            <option value="likes" {% if request.args.get('order_by') == 'likes' %}selected{% endif %}>点赞数</option>
+            <option value="views" {% if request.args.get('order_by') == 'views' %}selected{% endif %}>观看数</option>
+            <option value="followers_after" {% if request.args.get('order_by') == 'followers_after' %}selected{% endif %}>涨粉</option>
+        </select>
+    </div>
+    <div class="filter-group">
+        <select id="order" onchange="applyFilter()">
+            <option value="DESC" {% if request.args.get('order', 'DESC') == 'DESC' %}selected{% endif %}>降序</option>
+            <option value="ASC" {% if request.args.get('order') == 'ASC' %}selected{% endif %}>升序</option>
+        </select>
+    </div>
+    <div class="filter-group">
+        <label>类型</label>
+        <select id="typeFilter" onchange="applyFilter()">
+            <option value="">全部</option>
+            <option value="图文" {% if request.args.get('type') == '图文' %}selected{% endif %}>图文</option>
+            <option value="视频" {% if request.args.get('type') == '视频' %}selected{% endif %}>视频</option>
+        </select>
+    </div>
+</div>
+
+<!-- Notes Table -->
+<div class="card">
+    {% if notes %}
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>标题</th>
+                <th>类型</th>
+                <th>发布时间</th>
+                <th>曝光</th>
+                <th>点赞</th>
+                <th>收藏</th>
+                <th>涨粉</th>
+                <th>操作</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for note in notes %}
+            <tr>
+                <td style="max-width: 220px;">
+                    <span title="{{ note.title }}" style="display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                        {{ note.title[:32] }}{% if note.title|length > 32 %}...{% endif %}
+                    </span>
+                </td>
+                <td>
+                    <span class="badge {% if note.type == '图文' %}badge-blue{% else %}badge-orange{% endif %}">
+                        {{ note.type or '未知' }}
+                    </span>
+                </td>
+                <td>{{ note.publish_time[:10] if note.publish_time else '-' }}</td>
+                <td>{{ "{:,}".format(note.exposure or 0) }}</td>
+                <td>{{ "{:,}".format(note.likes or 0) }}</td>
+                <td>{{ "{:,}".format(note.saves or 0) }}</td>
+                <td>
+                    {% set gain = (note.followers_after or 0) - (note.followers_before or 0) %}
+                    {% if gain > 0 %}
+                        <span class="positive">+{{ gain }}</span>
+                    {% elif gain < 0 %}
+                        <span class="negative">{{ gain }}</span>
+                    {% else %}
+                        -
+                    {% endif %}
+                </td>
+                <td class="actions-cell">
+                    <a href="{{ url_for('edit_note', note_id=note.id) }}" class="btn btn-sm btn-secondary">编辑</a>
+                    <button class="btn btn-sm btn-danger" onclick="deleteNote({{ note.id }})">删除</button>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <div class="empty-state">
+        <svg class="empty-state-icon" xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/>
+            <polyline points="14 2 14 8 20 8"/>
+        </svg>
+        <p>暂无笔记数据</p>
+        <p>可以手动添加或从Excel导入</p>
+        <a href="{{ url_for('add_note') }}" class="btn btn-primary" style="margin-top: 14px;">添加笔记</a>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Import Modal -->
+<div id="importModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2>导入Excel数据</h2>
+            <button class="close-btn" onclick="hideImportModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+            <p style="font-size: 13px; color: var(--accent-green);">支持小红书创作者中心导出格式</p>
+            <p class="import-hint">自动识别以下列：</p>
+            <ul class="column-list">
+                <li>笔记标题、首次发布时间、体裁</li>
+                <li>曝光、观看量、封面点击率</li>
+                <li>点赞、评论、收藏、分享</li>
+            </ul>
+            <p class="import-note">其他列会自动忽略</p>
+            <form id="importForm" enctype="multipart/form-data">
+                <div class="form-group" style="margin-top: 14px;">
+                    <input type="file" name="file" id="excelFile" accept=".xlsx,.xls" required style="font-size: 13px;">
+                </div>
+                <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 12px;">开始导入</button>
+            </form>
+            <div id="importResult" class="import-result"></div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    lucide.createIcons();
+
+    function applyFilter() {
+        const orderBy = document.getElementById('orderBy').value;
+        const order = document.getElementById('order').value;
+        const type = document.getElementById('typeFilter').value;
+        let url = '{{ url_for("notes") }}?order_by=' + orderBy + '&order=' + order;
+        if (type) url += '&type=' + encodeURIComponent(type);
+        window.location.href = url;
+    }
+
+    function deleteNote(noteId) {
+        if (confirm('确定要删除这条笔记吗？')) {
+            fetch('/notes/' + noteId + '/delete', { method: 'POST' })
+            .then(response => response.json())
+            .then(data => { if (data.success) window.location.reload(); });
+        }
+    }
+
+    function showImportModal() {
+        document.getElementById('importModal').style.display = 'flex';
+    }
+
+    function hideImportModal() {
+        document.getElementById('importModal').style.display = 'none';
+        document.getElementById('importResult').innerHTML = '';
+    }
+
+    document.getElementById('importForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        const formData = new FormData();
+        formData.append('file', document.getElementById('excelFile').files[0]);
+        document.getElementById('importResult').innerHTML = '<p class="loading">正在导入...</p>';
+
+        fetch('/notes/import', { method: 'POST', body: formData })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                document.getElementById('importResult').innerHTML = '<p class="success">导入成功！共 ' + data.imported + ' 条</p>';
+                setTimeout(() => window.location.reload(), 1200);
+            } else {
+                document.getElementById('importResult').innerHTML = '<p class="error">' + data.error + '</p>';
+            }
+        })
+        .catch(error => {
+            document.getElementById('importResult').innerHTML = '<p class="error">导入失败</p>';
+        });
+    });
+
+    document.getElementById('importModal').addEventListener('click', function(e) {
+        if (e.target === this) hideImportModal();
+    });
+</script>
+{% endblock %}

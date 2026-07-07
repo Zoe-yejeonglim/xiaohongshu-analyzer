@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+
+{% block title %}设置 - 小红书运营分析助手{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div class="page-header-row">
+        <div>
+            <h1 class="page-title">设置</h1>
+            <p class="page-subtitle">配置 API 和数据管理</p>
+        </div>
+    </div>
+</div>
+
+<div class="settings-grid">
+    <!-- API Key -->
+    <div class="settings-card">
+        <h3 class="settings-card-title">Claude API Key</h3>
+        <p class="settings-card-desc">AI 分析功能需要配置 API Key，数据仅存储在本地</p>
+
+        <form method="POST">
+            {% if has_key %}
+            <div class="current-key">
+                <span>当前: {{ masked_key }}</span>
+                <span class="key-status">已配置</span>
+            </div>
+            {% endif %}
+            <div class="form-group">
+                <label>API Key</label>
+                <input type="password" name="api_key"
+                       placeholder="{% if has_key %}输入新 Key 覆盖{% else %}输入 API Key{% endif %}">
+            </div>
+            <button type="submit" class="btn btn-primary" style="margin-top: 10px;">保存</button>
+        </form>
+
+        <div class="api-help">
+            <h4>如何获取？</h4>
+            <ol>
+                <li>访问 <a href="https://console.anthropic.com" target="_blank">console.anthropic.com</a></li>
+                <li>注册或登录账号</li>
+                <li>进入 API Keys 页面</li>
+                <li>点击 Create Key 创建</li>
+                <li>复制并保存</li>
+            </ol>
+            <p style="margin-top: 10px; font-size: 11px; color: var(--text-muted);">
+                费用：按使用量计费，每次分析约 $0.01-0.05
+            </p>
+        </div>
+    </div>
+
+    <!-- Data Export -->
+    <div class="settings-card">
+        <h3 class="settings-card-title">数据导出</h3>
+        <p class="settings-card-desc">导出笔记数据用于备份</p>
+
+        <div class="export-buttons">
+            <a href="/api/export/json" class="btn btn-secondary" download="notes.json">
+                <i data-lucide="file-json"></i>
+                JSON
+            </a>
+            <a href="/api/export/csv" class="btn btn-secondary" download="notes.csv">
+                <i data-lucide="file-spreadsheet"></i>
+                CSV
+            </a>
+        </div>
+    </div>
+
+    <!-- About -->
+    <div class="settings-card">
+        <h3 class="settings-card-title">关于</h3>
+        <div style="font-size: 13px; color: var(--text-secondary);">
+            <p style="margin-bottom: 10px;"><strong>小红书运营分析助手</strong> v1.0</p>
+            <p style="margin-bottom: 14px;">分析账号数据、追踪涨粉趋势、获取 AI 运营建议</p>
+            <div style="display: flex; flex-wrap: wrap; gap: 6px;">
+                <span class="badge badge-green">本地运行</span>
+                <span class="badge badge-green">数据安全</span>
+                <span class="badge badge-green">Excel 导入</span>
+                <span class="badge badge-green">AI 分析</span>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>lucide.createIcons();</script>
+{% endblock %}
