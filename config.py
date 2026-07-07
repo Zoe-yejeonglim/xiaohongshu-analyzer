@@ -37,8 +37,13 @@ SCRAPER_TIMEOUT = 30000
 SCRAPER_SCROLL_DELAY = 0.6
 SCRAPER_MAX_SCROLLS = 200
 
-# 确保数据目录存在
+# 确保数据目录存在（Vercel环境跳过，因为是只读文件系统）
 def init_dirs():
     """初始化必要的目录"""
-    DATA_DIR.mkdir(parents=True, exist_ok=True)
-    BROWSER_DATA_DIR.mkdir(parents=True, exist_ok=True)
+    if os.environ.get("VERCEL"):
+        return  # Vercel环境不创建目录
+    try:
+        DATA_DIR.mkdir(parents=True, exist_ok=True)
+        BROWSER_DATA_DIR.mkdir(parents=True, exist_ok=True)
+    except Exception:
+        pass

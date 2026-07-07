@@ -1,3 +1,4 @@
+import os
 from dotenv import load_dotenv
 load_dotenv()  # 加载.env文件
 
@@ -8,8 +9,14 @@ import re
 import config
 import database
 import ai_analyzer
-import scraper
 from helpers import save_scraped_data
+
+# Vercel环境不加载scraper（需要浏览器）
+IS_VERCEL = os.environ.get("VERCEL")
+if not IS_VERCEL:
+    import scraper
+else:
+    scraper = None
 
 app = Flask(__name__)
 
@@ -377,6 +384,9 @@ def export_data(format):
 @app.route('/api/scrape/start', methods=['POST'])
 def api_start_scrape():
     """开始抓取小红书数据"""
+    if IS_VERCEL or scraper is None:
+        return jsonify({'success': False, 'error': '爬虫功能仅在本地运行，请在电脑上使用'}), 400
+
     try:
         result = scraper.start_scrape()
 
@@ -395,6 +405,9 @@ def api_start_scrape():
 @app.route('/api/scrape/continue', methods=['POST'])
 def api_continue_scrape():
     """登录后继续抓取"""
+    if IS_VERCEL or scraper is None:
+        return jsonify({'success': False, 'error': '爬虫功能仅在本地运行'}), 400
+
     try:
         result = scraper.finish_scrape()
 
@@ -413,6 +426,9 @@ def api_continue_scrape():
 @app.route('/api/scrape/cancel', methods=['POST'])
 def cancel_scrape():
     """取消抓取"""
+    if IS_VERCEL or scraper is None:
+        return jsonify({'success': True})
+
     try:
         scraper.close_browser()
         return jsonify({'success': True})
