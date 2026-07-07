@@ -80,7 +80,7 @@
                         {{ note.type or '未知' }}
                     </span>
                 </td>
-                <td>{{ note.publish_time[:10] if note.publish_time else '-' }}</td>
+                <td>{{ (note.publish_time|string)[:10] if note.publish_time else '-' }}</td>
                 <td>{{ "{:,}".format(note.exposure or 0) }}</td>
                 <td>{{ "{:,}".format(note.likes or 0) }}</td>
                 <td>{{ "{:,}".format(note.saves or 0) }}</td>
